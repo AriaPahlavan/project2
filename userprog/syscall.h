@@ -1,6 +1,9 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+
+typedef int pid_t;
+
 void syscall_init (void);
 
 void halt(void);
@@ -10,10 +13,6 @@ void exit(int status);
 pid_t exec(const char *cmd_line);
 
 int wait(pid_t pid);
-
-bool create(const char*file, unsinged initial_size);
-
-bool remove(const char *file);
 
 int open(const char *file);
 

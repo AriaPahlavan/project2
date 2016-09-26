@@ -1,19 +1,34 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include "../lib/stdbool.h"
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include "threads/init.h"
 #include "../lib/kernel/list.h"
 #include "../lib/kernel/hash.h"
 #include "../threads/synch.h"
 #include "../filesys/file.h"
 #include "../filesys/filesys.h"
+#include "process.h"
+#include "../devices/shutdown.h"
+#include "../devices/input.h"
+#include "../threads/malloc.h"
+#include "../threads/vaddr.h"
+
+#define max_param 3
+int syscall_param[max_param];
 
 unsigned fd_counter;
 
 struct lock lock_filesys;
+
+struct file_def* find_file_def(int fd);
+
+bool create(const char* file, unsigned initial_size);
+
+bool remove(const char* file);
 
 struct file_def{ /*contains all info of a currently opened file*/
   struct list_elem elem;
@@ -35,7 +50,23 @@ syscall_init (void)
   fd_counter = 2; /*initialze fd and open_file list*/
   list_init (&open_file_list);
   /*TODO:filesys_init needed?*/
+  filesys_init(true);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+}
+
+static int get_syscall_num(void){
+  return -1;
+}
+
+static void get_syscall_arg(int* esp, int num){
+  int* param_ptr;
+  for (int i=0;i<num;i++){
+    param_ptr = esp + i + 1;
+    if (!is_user_vaddr(param_ptr)){
+      exit(-1);
+    }
+    syscall_param[i] = *param_ptr;
+  }
 }
 
 static void
@@ -43,20 +74,90 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   printf ("system call!\n");
 
-  /*TODO:add switch case for all different syscalls*/
+  struct thread* cur_thread = thread_current();
 
-  thread_exit ();
+  int syscall_num = get_syscall_num();/*TODO: find this number*/
+
+  if ((syscall_num > SYS_INUMBER) || (syscall_num < SYS_HALT)){
+    cur_thread->status = -1;
+    thread_exit();
+  }
+
+
+  switch(syscall_num) {
+    case SYS_HALT:                   
+      halt();
+      break;
+    case SYS_EXIT:               
+      get_syscall_arg((int*)f->esp,1);
+      exit(syscall_param[0]);
+      break;
+    case SYS_EXEC:                   
+      get_syscall_arg((int*)f->esp,1);
+      f->eax = (int)exec((const char*)syscall_param[0]);
+      break;
+    case SYS_WAIT:                 
+      get_syscall_arg((int*)f->esp,1);
+      f->eax = wait((pid_t)syscall_param[0]);
+      break;
+    case SYS_CREATE:                
+      get_syscall_arg((int*)f->esp,2);
+      f->eax = (int)create((const char*)syscall_param[0],(unsigned)syscall_param[1]);
+      break;
+    case SYS_REMOVE:                
+      get_syscall_arg((int*)f->esp,1);
+      f->eax = (int)remove((const char*)syscall_param[0]);
+      break;
+    case SYS_OPEN:             
+      get_syscall_arg((int*)f->esp,1);
+      f->eax = open((const char*)syscall_param[0]);
+      break;
+    case SYS_FILESIZE:           
+      get_syscall_arg((int*)f->esp,1);
+      f->eax = filesize(syscall_param[0]);
+      break;
+    case SYS_READ:                
+      get_syscall_arg((int*)f->esp,3);
+      f->eax = read(syscall_param[0],(void*)syscall_param[1],(unsigned)syscall_param[2]);
+      break;
+   case SYS_WRITE:              
+      get_syscall_arg((int*)f->esp,3);
+      f->eax = write(syscall_param[0],(const void*)syscall_param[1],(unsigned)syscall_param[2]);
+      break;
+    case SYS_SEEK:                 
+      get_syscall_arg((int*)f->esp,2);
+      seek(syscall_param[0],(unsigned)syscall_param[1]);
+      break;
+    case SYS_TELL:                  
+      get_syscall_arg((int*)f->esp,1);
+      f->eax = (unsigned)tell(syscall_param[0]);
+      break;
+    case SYS_CLOSE:             
+      get_syscall_arg((int*)f->esp,1);
+      close(syscall_param[0]);
+      break;
+   }
 }
 
 void halt(void){
   shutdown_power_off();
 }
 
-void exit(int status){}
+void exit(int status){
+  struct thread *cur_thread = thread_current(); 
+  cur_thread->status = status;
+  thread_exit();
+}
 
-int exec(const char* cmd_line){return 0;}
+int exec(const char* cmd_line){
+  int retval = process_execute(cmd_line);
+  return retval;
+}
 
-int wait(int pid){return 0;}
+int wait(int pid){
+  int retval = process_wait(pid);
+  return retval;
+}
 
 bool create(const char* file, unsigned initial_size){
   lock_acquire(&lock_filesys);	/*declares ownership of filesys*/
@@ -88,6 +189,8 @@ int open(const char* file){
   lock_acquire(&lock_filesys);
   struct file *fp = filesys_open(file);
   unsigned cur_hash_num = hash_string(file);
+  char* file_str_ptr = (char*)file;
+  unsigned i = 0;
 
   if (fp == NULL) {
     lock_release(&lock_filesys);
@@ -111,8 +214,11 @@ int open(const char* file){
     return -1;
   }
   
-  /*TODO: do not use strcpy*/
-  strcpy(cur_file->file_str,file);
+  while(file_str_ptr!=0){
+    *(cur_file->file_str+i) = *(file_str_ptr+i);
+    i++;
+  }
+
   cur_file->opened_file = fp;
   cur_file->fd = fd_counter;
 
@@ -169,7 +275,7 @@ int read(int fd, void* buffer,unsigned size){
   int32_t retval;
   /*read from keyboard*/
   if (fd == 0){
-    uint8_t *buffer_;
+    uint8_t *buffer_ = (uint8_t *)buffer;
     for (unsigned i=0;i<size;i++){
       *(buffer_+i) = input_getc();
     }
@@ -219,7 +325,6 @@ void seek(int fd, unsigned position){
   struct file_def* fp = find_file_def(fd);
    if (fp == NULL){
     lock_release(&lock_filesys);
-    return 0;
   }
  file_seek(fp->opened_file,position);
   lock_release(&lock_filesys);
@@ -251,7 +356,7 @@ void close(int fd){
   file_close(fp->opened_file);
 
   /*remove from list*/
-  list_remove(fp->opened_file);
+  list_remove(&(fp->elem));
 
   /*free memory*/
   free(fp->file_str);
