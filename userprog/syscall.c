@@ -15,7 +15,7 @@ unsigned fd_counter;
 
 struct lock lock_filesys;
 
-struct file_def{ //contains all info of a currently opened file
+struct file_def{ /*contains all info of a currently opened file*/
   struct list_elem elem;
   unsigned hash_num;
   char* file_str;
@@ -23,8 +23,8 @@ struct file_def{ //contains all info of a currently opened file
   int fd;
 };
 
-struct list open_file_list;//contains all currently opend files
-struct list_elem* e;//used for iterator
+struct list open_file_list;/*contains all currently opend files*/
+struct list_elem* e;/*used for iterator*/
 
 static void syscall_handler (struct intr_frame *);
 
@@ -32,9 +32,9 @@ void
 syscall_init (void) 
 {
 
-  fd_counter = 2; //initialze fd and open_file list 
+  fd_counter = 2; /*initialze fd and open_file list*/
   list_init (&open_file_list);
-  //TODO:filesys_init needed?
+  /*TODO:filesys_init needed?*/
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -43,7 +43,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 {
   printf ("system call!\n");
 
-  //TODO:add switch case for all different syscalls
+  /*TODO:add switch case for all different syscalls*/
 
   thread_exit ();
 }
@@ -59,9 +59,9 @@ int exec(const char* cmd_line){return 0;}
 int wait(int pid){return 0;}
 
 bool create(const char* file, unsigned initial_size){
-  lock_acquire(&lock_filesys);	//declares ownership of filesys
+  lock_acquire(&lock_filesys);	/*declares ownership of filesys*/
   bool retval = filesys_create(file,initial_size);
-  lock_release(&lock_filesys);  //release ownership
+  lock_release(&lock_filesys);  /*release ownership*/
   return retval;
 }
 
@@ -70,7 +70,7 @@ bool remove(const char* file){
   bool retval = filesys_remove(file);
   unsigned cur_hash_num = hash_string(file);
 
-  //remove all associated file_def in list
+  /*remove all associated file_def in list*/
   for(e = list_begin(&open_file_list);e != list_end(&open_file_list);e = list_next(e))  {
     struct file_def* fp = list_entry(e,struct file_def, elem);
     if (cur_hash_num == fp->hash_num){
@@ -94,7 +94,7 @@ int open(const char* file){
     return -1;
   }
 
-  //maintain record for newly opened file
+  /*maintain record for newly opened file*/
   struct file_def *cur_file = (struct file_def*)malloc(sizeof(struct file_def));    
   if (cur_file == NULL) {
     file_close(fp);
@@ -111,19 +111,19 @@ int open(const char* file){
     return -1;
   }
   
-  //TODO: do not use strcpy
+  /*TODO: do not use strcpy*/
   strcpy(cur_file->file_str,file);
   cur_file->opened_file = fp;
   cur_file->fd = fd_counter;
 
-  //add newly opened file to opened file list
+  //add newly opened file to opened file list*/
   list_push_back(&open_file_list,&(cur_file->elem));
 
-  //fd_counter calculation
+  /*fd_counter calculation*/
   ++fd_counter;
   if ((fd_counter == 0) || (fd_counter == 1)) fd_counter = 2;
 
-  //close same file in linklist, call close function
+  /*close same file in linklist, call close function*/
   for(e = list_begin(&open_file_list);e != list_end(&open_file_list);e = list_next(e))  {
     struct file_def* fp = list_entry(e,struct file_def, elem);
     if (cur_hash_num == fp->hash_num){
@@ -140,7 +140,7 @@ int open(const char* file){
 }
 
 
-  //return the file_def struct with given fd
+  /*return the file_def struct with given fd*/
 struct file_def* find_file_def(int fd){
   for(e = list_begin(&open_file_list);e != list_end(&open_file_list);e = list_next(e))  {
     struct file_def* fp = list_entry(e,struct file_def, elem);
@@ -167,7 +167,7 @@ int filesize(int fd){
 int read(int fd, void* buffer,unsigned size){
   lock_acquire(&lock_filesys);
   int32_t retval;
-  //read from keyboard
+  /*read from keyboard*/
   if (fd == 0){
     uint8_t *buffer_;
     for (unsigned i=0;i<size;i++){
@@ -191,9 +191,9 @@ int write(int fd, const void* buffer, unsigned size){
   lock_acquire(&lock_filesys);
   int32_t retval;
   unsigned counter = 0;
-  //write to console
+  /*write to console*/
   if (fd == 1){
-    //call putbuf to putbuf()
+    /*call putbuf to putbuf()*/
     while(size > 512){
       putbuf((char*)buffer+counter,512);
       counter = counter + 512;
@@ -247,13 +247,13 @@ void close(int fd){
     lock_release(&lock_filesys);
   }
 
-  //close file
+  /*close file*/
   file_close(fp->opened_file);
 
-  //remove from list
+  /*remove from list*/
   list_remove(fp->opened_file);
 
-  //free memory
+  /*free memory*/
   free(fp->file_str);
   free(fp);
   lock_release(&lock_filesys);
