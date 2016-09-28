@@ -47,7 +47,7 @@ child *child_new(const char *prog) {
 
   strlcpy(c->prog, prog, PGSIZE);
 			    
-  sema_init(c->sema, 1);			
+  sema_init(c->sema, 0); /*block the exit of the calling process*/
 
   c->argc = 0;
   int argvMAX = 1;
@@ -105,7 +105,6 @@ process_execute (const char *prog)
   /* @Niko: Create a instance of child struct */
   child *childProcess;
   tid_t tid;
-  
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   childProcess = child_new(prog); /* @Niko: this is ours we can make it to point to the child structure*/
@@ -113,7 +112,7 @@ process_execute (const char *prog)
     return TID_ERROR;
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (prog, PRI_DEFAULT, start_process, childProcess->prog); /*this may need to change...*/
+  tid = thread_create (childProcess->prog, PRI_DEFAULT, start_process, childProcess); /*this may need to change...*/
   if (tid == TID_ERROR)
     child_destroy(childProcess);
 
@@ -142,15 +141,15 @@ start_process (void *cp) /*@Nico: void *file_name_ need to be changed to a child
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (childProcess, &if_.eip, &if_.esp); /* @Nico: you have two options: 1) Only send the file name to load... 
-  													no args should be send to load.
-  													In other words, make sure that file_name only contains the file name and no arguments
-  													(example: if command line is "ls -l", only pass "ls" to load) The reason is that load 
-  													also loads the file executable from disk onto the memory. If you choose this option,
-  													then you need to do the setup_stack call here (after "if(!success)"), instead of doing 
-  													it inside the load function
+							no args should be send to load.
+							In other words, make sure that file_name only contains the file name and no arguments
+							(example: if command line is "ls -l", only pass "ls" to load) The reason is that load 
+							also loads the file executable from disk onto the memory. If you choose this option,
+							then you need to do the setup_stack call here (after "if(!success)"), instead of doing 
+							it inside the load function
 
-  													2) send the whole command and make sure in load function, you only pass file name to
-  													filesys_open without any arguments. */
+							2) send the whole command and make sure in load function, you only pass file name to
+							filesys_open without any arguments. */
 
   /* If load failed, quit. */
   if (!success) 
@@ -180,9 +179,16 @@ start_process (void *cp) /*@Nico: void *file_name_ need to be changed to a child
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;	/* @Nico: this needs to get modified so that it waits properly and syncs with child*/
+  if(child_tid == TID_ERROR) {
+    return -1;
+  } else if(thread_tid() != child_tid) {
+    return -1;
+  }
+
+  while(thread_current()->status != THREAD_DYING) {}	/* @Nico: this needs to get modified so that it waits properly and syncs with child*/
+  return 0;
 }
 
 /* Free the current process's resources. */
@@ -542,29 +548,25 @@ setup_stack (void **esp, const child *childProcess)
     }
 
   mp.c = (char*) PHYS_BASE - 1;
-  /*@Nico: all of these variables created here can be part of child struct*/
-  int i;
-  int total = 0;
+  int i, j;
+  int total;
   for(i = 0; i < childProcess->argc; ++i) {
-    int j;
     char *arg = childProcess->argv[childProcess->argc - i - 1];
     int len = strlen(arg);
     for(j = 0; j <= len; ++j) {
       *(mp.c) = arg[len - j];
       --(mp.c);
-      ++total;
     }
   }
 
   /*offset padding*/
-  int div = total % sizeof(int); /*obtain padding offset*/
-  if(div) {
-    for(i = 0; i < div; ++i) {
-      *(mp.c) = 0x00; /*padding if needed*/
-      --(mp.c);
-    }
+  while(((int) (mp.c + 1)) % sizeof(int)) {
+    *(mp.c) = 0x00;
+    --(mp.c);
   }
-  
+
+  mp.c -= 3; /*move back mp.c so that mp is pointing to an int addr*/
+
   /*delimit end of argv array*/
   *(mp.i) = 0x0000;
   --(mp.i);
@@ -574,7 +576,8 @@ setup_stack (void **esp, const child *childProcess)
   total = 0;
   for(i = 0; i < childProcess->argc; ++i) {
     total += strlen(childProcess->argv[childProcess->argc - 1 - i]);
-    *(mp.i) = start - total;
+    int argv = start - total;
+    *(mp.i) = argv;
     --(mp.i);
   }
 
@@ -589,8 +592,7 @@ setup_stack (void **esp, const child *childProcess)
   /*ret addr*/
   *(mp.i) = 0x0000; /*for now...*/
 
-  *esp = mp.i;
-
+  *esp = mp.i; /*set the stack ptr to prepare for execution*/
   return success;
 }
 
