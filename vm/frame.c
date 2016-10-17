@@ -35,12 +35,15 @@ void* get_frame(enum palloc_flags flag){
 }
 
 struct frame* find_frame(void* pa){
+  lock_acqruie(frame_lock);
   for(e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e)) {
     struct frame * fp = list_entry(e, struct frame, list_elem);
     if (fp-> == pa) {
+      lock_release(frame_lock);
       return fp;
     }
   }
+  lock_release(frame_lock);
   return NULL;
 }
 
@@ -52,6 +55,7 @@ static void evict_frame(void){
   if (cur_frame_ptr == NULL) cur_frame_ptr = &list_begin(&frame_list);
   cur_frame_ptr->LRU_bit = 0;
 
+  lock_acquire(frame_lock);
   //start with next frame and circulate the frame list
   for (e = list_next(*cur_frame_ptr); e != list_end(&frame_list); e = list_next(e)) {
     struct frame *fp = list_entry(e, struct frame, list_elem);
@@ -59,6 +63,11 @@ static void evict_frame(void){
       fp->LRU_bit = 1;
     } else {
       //TODO: evict this frame
+
+
+
+      lock_release(frame_lock);
+      return;
     }
   }
 
@@ -69,6 +78,10 @@ static void evict_frame(void){
       fp->LRU = 1;
     } else {
       //TODO: evict this frame
+
+
+      lock_release(frame_lock);
+      return;
     }
   }
 }
