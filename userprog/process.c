@@ -551,6 +551,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
   if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr)
     return false;
 
+
   /* Disallow mapping page 0.
      Not only is it a bad idea to map page 0, but if we allowed
      it then user code that passed a null pointer to system calls
