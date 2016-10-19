@@ -29,7 +29,7 @@ void frame_init(void){
 
 }
 
-void* get_frame(enum palloc_flags flag){
+void* get_frame(void){
 
   lock_acquire(frame_lock);
 
@@ -48,16 +48,21 @@ void* get_frame(enum palloc_flags flag){
 
 }
 
+void free_frame(void* pa) {
+  lock_acquire(frame_lock);
+  struct frame* fp = find_frame(pa);
+  if (fp == NULL) return;
+  fp->valid = false;
+  lock_release(frame_lock);
+}
+
 struct frame* find_frame(void* pa){
-  lock_acqruie(frame_lock);
   for(e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e)) {
     struct frame * fp = list_entry(e, struct frame, list_elem);
     if ((fp->page_addr == pa) && fp->valid) {
-      lock_release(frame_lock);
       return fp;
     }
   }
-  lock_release(frame_lock);
   return NULL;
 }
 

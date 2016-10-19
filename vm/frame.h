@@ -11,6 +11,8 @@ struct frame{
 
 void frame_init(void);
 
-void* get_frame(enum palloc_flags);
+void* get_frame(void);
+
+void free_frame(void* pa);
 
 struct frame* find_frame(void* pa);
