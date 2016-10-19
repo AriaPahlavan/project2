@@ -11,6 +11,8 @@ void frame_init(void){
   list_init(&frame_list);
   lock_init(&frame_lock);
   counter = 0;
+
+  //TODO get all pages here not as needed (you are getting pages as needed in get_frame)
 }
 
 void* get_frame(enum palloc_flags flag){
@@ -34,6 +36,10 @@ void* get_frame(enum palloc_flags flag){
   return page_addr;
 }
 
+
+
+//TODO we need a free_frame
+
 struct frame* find_frame(void* pa){
   lock_acqruie(frame_lock);
   for(e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e)) {
@@ -51,7 +57,7 @@ struct frame* find_frame(void* pa){
 //TODO: following function is not complete. The LRU algorithm to find the frame to be evicted is implemented; not yet implement how to actually evict the frame(just remove from list and call palloc?). Feel free to rewrite or change the function accordingly
 
 static void evict_frame(void){
-  //set current frame LRU bit to 0 
+  //set current frame LRU bit to 0
   if (cur_frame_ptr == NULL) cur_frame_ptr = &list_begin(&frame_list);
   cur_frame_ptr->LRU_bit = 0;
 
@@ -85,4 +91,3 @@ static void evict_frame(void){
     }
   }
 }
-
