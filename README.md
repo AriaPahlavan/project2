@@ -1,5 +1,23 @@
 # Project2 - Process API and SysCalls
 
+Irene:
+1. implemented draft version of syscall
+2. compiles if commment out strcpy line
+3. need to create prototype in header file
+4. need to debug
+
+
+
+
+
+
+
+
+
+
+
+
+
 This is the [User Programs][userprog] project in Pintos. To get started:
 
 - Form a team of 3 members
@@ -22,3 +40,9 @@ This is the [User Programs][userprog] project in Pintos. To get started:
 [ref-push]: http://gitref.org/remotes/#push
 [pull-request]: https://help.github.com/articles/creating-a-pull-request
 [raw]: https://raw.githubusercontent.com/education/guide/master/docs/forks.md
+
+#Group Messages
+-09-22-16
+-Nico - process.c (configuring minimal requiremtns for executing user programs)
+-Irene - syscall.c (implementing linked data structure for system calls)
+-Aria - Meeting Saturday to continue implementation 
