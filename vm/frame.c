@@ -8,37 +8,51 @@ static frame *cur_frame_ptr;
 
 
 void frame_init(void){
+  struct frame* frame_ptr;
+  void* page_addr;
+
   list_init(&frame_list);
   lock_init(&frame_lock);
-  counter = 0;
-}
 
-void* get_frame(enum palloc_flags flag){
-  void* page_addr = palloc_get_page(flags);
-
-  if (page_addr != NULL){
-    struct frame* frame_ptr = (struct frame*) malloc(sizeof(struct frame));
-    if (frame_ptr == NULL) return NULL;
+  while((page_addr = palloc_get_page(PAL_USER))){ /*acquire all available frames*/
+    frame_ptr = (struct frame*) malloc(sizeof(struct frame));
+    if (frame_ptr == NULL) return;
     frame_ptr->page_addr = page_addr;
     frame_ptr->LRU_bit = 0;
-    lock_init(pages_lock);
+    frame_ptr->valid = 0;
+    lock_init(frame_ptr->pages_lock);
     lock_acquire(frame_lock);
     list_push_back(&frame_list,&frame_ptr->list_elem);
     lock_release(frame_lock);
-
-  } else {
-    /*evict_frame();
-    return get_frame(flag);*/
   }
 
-  return page_addr;
+
+}
+
+void* get_frame(enum palloc_flags flag){
+
+  lock_acquire(frame_lock);
+
+  for(e = list_begin(&frame_list); e!= list_end(&frame_ist); e = list_next(e)){
+    struct frame* fp = list_entry(e, struct frame, list_elem);
+    if (!fp->valid){ /* current frame not inuse*/
+      fp->valid = true;
+      lock_release(frame_lock);
+      return fp->page_addr;
+    }
+  }
+    /*
+    lock_release(frame_lock);
+    evict_frame();
+    return get_frame(flag);*/
+
 }
 
 struct frame* find_frame(void* pa){
   lock_acqruie(frame_lock);
   for(e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e)) {
     struct frame * fp = list_entry(e, struct frame, list_elem);
-    if (fp-> == pa) {
+    if ((fp->page_addr == pa) && fp->valid) {
       lock_release(frame_lock);
       return fp;
     }
