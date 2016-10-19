@@ -12,7 +12,8 @@ void frame_init(void){
   lock_init(&frame_lock);
   counter = 0;
 
-  //TODO get all pages here not as needed (you are getting pages as needed in get_frame)
+  //TODO get all pages here (you are getting pages as needed in get_frame, which is not recomended)
+  //(i.e. while(palloc_get_page()))
 }
 
 void* get_frame(enum palloc_flags flag){
