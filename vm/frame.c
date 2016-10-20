@@ -1,4 +1,10 @@
 #include "frame.h"
+#include "../lib/kernel/hash.h"
+#include "../lib/kernel/list.h"
+#include "../filesys/file.h"
+#include "../filesys/filesys.h"
+#include "threads/palloc.h"
+#include "../threads/vaddr.h"
 
 struct lock frame_lock;
 
@@ -20,10 +26,10 @@ void frame_init(void){
     frame_ptr->page_addr = page_addr;
     frame_ptr->LRU_bit = 0;
     frame_ptr->valid = 0;
-    lock_init(frame_ptr->pages_lock);
-    lock_acquire(frame_lock);
+    lock_init(&frame_ptr->pages_lock);
+    lock_acquire(&frame_lock);
     list_push_back(&frame_list,&frame_ptr->list_elem);
-    lock_release(frame_lock);
+    lock_release(&frame_lock);
   }
 
 
@@ -70,7 +76,7 @@ struct frame* find_frame(void* pa){
 //TODO: following function is not complete. The LRU algorithm to find the frame to be evicted is implemented; not yet implement how to actually evict the frame(just remove from list and call palloc?). Feel free to rewrite or change the function accordingly
 
 static void evict_frame(void){
-  //set current frame LRU bit to 0 
+  //set current frame LRU bit to 0
   if (cur_frame_ptr == NULL) cur_frame_ptr = &list_begin(&frame_list);
   cur_frame_ptr->LRU_bit = 0;
 
@@ -104,4 +110,3 @@ static void evict_frame(void){
     }
   }
 }
-

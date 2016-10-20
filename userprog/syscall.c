@@ -56,7 +56,7 @@ get_user_byte (const uint8_t *uaddr)
 
   return result;
 }
- 
+
 /*same behavior as get_user_byte only now for a 32-bit int*/
 static int
 get_user_int (const uint32_t *uaddr) {
@@ -70,7 +70,7 @@ get_user_int (const uint32_t *uaddr) {
       ret = -1;
       break;
     }
-    
+
     ++caddr;
   }
 
@@ -112,7 +112,7 @@ put_user_int (uint32_t *udst, uint32_t fourBytes) {
     if(!(ret = put_user_byte(caddr, cwrt[i]))) {
       break;
     }
-    
+
     ++caddr;
   }
 
@@ -123,7 +123,7 @@ put_user_int (uint32_t *udst, uint32_t fourBytes) {
 static void syscall_handler (struct intr_frame *);
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   lock_init(&lock_filesys);
   fd_counter = 2; /*initialze fd and open_file list*/
@@ -148,7 +148,7 @@ static void get_syscall_arg(int* esp, int num){
 
 */
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f UNUSED)
 {
   int syscall_num;
   if(is_user_vaddr(f->esp)) {
@@ -164,54 +164,54 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
 
   switch(syscall_num) {
-    case SYS_HALT:                   
+    case SYS_HALT:
       halt();
       break;
-    case SYS_EXIT:               
+    case SYS_EXIT:
       get_syscall_arg((int*)f->esp,1);
       exit(syscall_param[0]);
       break;
-    case SYS_EXEC:                   
+    case SYS_EXEC:
       get_syscall_arg((int*)f->esp,1);
       f->eax = (int)exec((const char*)syscall_param[0]);
       break;
-    case SYS_WAIT:                 
+    case SYS_WAIT:
       get_syscall_arg((int*)f->esp,1);
       f->eax = wait((pid_t)syscall_param[0]);
       break;
-    case SYS_CREATE:                
+    case SYS_CREATE:
       get_syscall_arg((int*)f->esp,2);
       f->eax = (int)create((const char*)syscall_param[0],(unsigned)syscall_param[1]);
       break;
-    case SYS_REMOVE:                
+    case SYS_REMOVE:
       get_syscall_arg((int*)f->esp,1);
       f->eax = (int)remove((const char*)syscall_param[0]);
       break;
-    case SYS_OPEN:             
+    case SYS_OPEN:
       get_syscall_arg((int*)f->esp,1);
       f->eax = open((const char*)syscall_param[0]);
       break;
-    case SYS_FILESIZE:           
+    case SYS_FILESIZE:
       get_syscall_arg((int*)f->esp,1);
       f->eax = filesize(syscall_param[0]);
       break;
-    case SYS_READ:                
+    case SYS_READ:
       get_syscall_arg((int*)f->esp,3);
       f->eax = read(syscall_param[0],(void*)syscall_param[1],(unsigned)syscall_param[2]);
       break;
-   case SYS_WRITE:              
+   case SYS_WRITE:
       get_syscall_arg((int*)f->esp,3);
       f->eax = write(syscall_param[0],(const void*)syscall_param[1],(unsigned)syscall_param[2]);
       break;
-    case SYS_SEEK:                 
+    case SYS_SEEK:
       get_syscall_arg((int*)f->esp,2);
       seek(syscall_param[0],(unsigned)syscall_param[1]);
       break;
-    case SYS_TELL:                  
+    case SYS_TELL:
       get_syscall_arg((int*)f->esp,1);
       f->eax = (unsigned)tell(syscall_param[0]);
       break;
-    case SYS_CLOSE:             
+    case SYS_CLOSE:
       get_syscall_arg((int*)f->esp,1);
       close(syscall_param[0]);
       break;
@@ -270,7 +270,7 @@ bool remove(const char* file){
     struct file_def* fp = list_entry(e,struct file_def, elem);
     if (cur_hash_num == fp->hash_num){
       if (strcmp(file,fp->file_str)==0){
-	      list_remove(&(fp->elem));	
+	      list_remove(&(fp->elem));
       }
     }
   }
@@ -282,7 +282,7 @@ bool remove(const char* file){
 }
 
 int open(const char* file){
-  if (file == NULL) { 
+  if (file == NULL) {
     exit(-1);
     return -1;
   }
@@ -299,13 +299,13 @@ int open(const char* file){
   }
 
   /*maintain record for newly opened file*/
-  struct file_def *cur_file = (struct file_def*)malloc(sizeof(struct file_def));    
+  struct file_def *cur_file = (struct file_def*)malloc(sizeof(struct file_def));
   if (cur_file == NULL) {
     file_close(fp);
     lock_release(&lock_filesys);
     return -1;
   }
-  cur_file->hash_num = cur_hash_num; 
+  cur_file->hash_num = cur_hash_num;
   cur_file->file_str = (char*) malloc(15);
 
   cur_file->tid = thread_current()->tid;
@@ -330,7 +330,7 @@ int open(const char* file){
     if (cur_hash_num == fp->hash_num){
       if (strcmp(file,fp->file_str)==0){
         lock_release(&lock_filesys);
-	close(fp->fd);	
+	close(fp->fd);
         lock_acquire(&lock_filesys);
         break;
       }
@@ -355,7 +355,7 @@ struct file_def* find_file_def(int fd){
   for(e = list_begin(&open_file_list);e != list_end(&open_file_list);e = list_next(e))  {
     struct file_def* fp = list_entry(e,struct file_def, elem);
       if (fd == fp->fd){
-        return fp; 
+        return fp;
     }
   }
   return NULL;
@@ -426,7 +426,7 @@ int write(int fd, const void* buffer, unsigned size){
   }
    retval = (int32_t)file_write(fp->opened_file,buffer,size);
   lock_release(&lock_filesys);
-  
+
   return retval;
 }
 
@@ -476,7 +476,7 @@ void close(int fd){
     /*free memory*/
     free(fp->file_str);
     free(fp);
-  } 
+  }
 
   lock_release(&lock_filesys);
 }
