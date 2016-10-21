@@ -150,20 +150,18 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  if(!user) { /*according to the pintos documentation...*/
+  if(!user) { /*according to the pintos documentation for userprog. This may need to change for vm.*/
     f->eip = f->eax;
     f->eax = 0xffffffff;
     return;
+  } else {
+    /*check that fault_addr is a valid address. If not, kill the process.*/
+    if(is_user_vaddr(fault_addr)) {
+      /*load a frame with the needed data*/
+      current_thread()->s_pt
+    } else {
+      kill(f);
+    }
   }
-
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
 }
 

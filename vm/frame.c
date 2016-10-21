@@ -59,7 +59,7 @@ void* get_frame(void){
   if(!ret) {
     debug_panic("frame.c", "58", "get_frame", "Temporary kernel panic until swapping is implemented");
   }
-  /*TEMP*/
+  /*TEMP */
 
 }
 

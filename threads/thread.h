@@ -2,6 +2,7 @@
 #define THREADS_THREAD_H
 
 #include <debug.h>
+#include <hash.h>
 #include <list.h>
 #include <stdint.h>
 
@@ -100,6 +101,8 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    
+    struct hash *spt; /*supplementary page table*/
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
