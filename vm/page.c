@@ -31,7 +31,7 @@ static spte *spte_new(const void *vaddr) {
   s->vaddr = (void*) vaddr;
   s->page_loc = PAGE_IN_MEM;
   s->isPinned = false;
-
+  s->swap_i = -1;
   return s;
 }
 

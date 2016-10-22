@@ -3,18 +3,22 @@
 #include "lib/debug.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
+#include "threads/thread.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/vaddr.h"
-
-#include "frame.h"
+#include "userprog/pagedir.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+#include "vm/swap.h"
 
 struct lock frame_lock;
 
 static struct list frame_list;
 static struct list_elem *e;
-static struct frame *cur_frame_ptr;
+static struct frame *clk_frame_ptr;
 
+static void *evict_frame(void);
 
 void frame_init(void){
   struct frame* frame_ptr;
@@ -27,13 +31,14 @@ void frame_init(void){
     frame_ptr = (struct frame*) malloc(sizeof(struct frame));
     if (frame_ptr == NULL) return;
     frame_ptr->page_addr = page_addr;
-    frame_ptr->LRU_bit = 0;
     frame_ptr->valid = 0;
     lock_init(&frame_ptr->pages_lock);
     lock_acquire(&frame_lock);
     list_push_back(&frame_list,&frame_ptr->elem);
     lock_release(&frame_lock);
   }
+
+  clk_frame_ptr = NULL;
 }
 
 void* get_frame(void){
@@ -50,16 +55,11 @@ void* get_frame(void){
       lock_release(&frame_lock);
     }
   }
-    /*
-    lock_release(frame_lock);
-    evict_frame();
-    return get_frame(flag);*/
-
-  /*TEMP*/
+    
   if(!ret) {
-    debug_panic("frame.c", 58, "get_frame", "Temporary kernel panic until swapping is implemented");
+    lock_release(&frame_lock);
+    ret = evict_frame();
   }
-  /*TEMP */
 
   return ret;
 }
@@ -85,38 +85,41 @@ struct frame* find_frame(void* pa){
 
 //TODO: following function is not complete. The LRU algorithm to find the frame to be evicted is implemented; not yet implement how to actually evict the frame(just remove from list and call palloc?). Feel free to rewrite or change the function accordingly
 
-static void evict_frame(void){
+static void *evict_frame(void){
   //set current frame LRU bit to 0
-  if (cur_frame_ptr == NULL) cur_frame_ptr = list_entry(list_begin(&frame_list), struct frame, elem);
-  cur_frame_ptr->LRU_bit = 0;
+  if (clk_frame_ptr == NULL) clk_frame_ptr = list_entry(list_begin(&frame_list), struct frame, elem);
 
   lock_acquire(&frame_lock);
   //start with next frame and circulate the frame list
-  for (e = list_begin(&frame_list); e != list_end(&frame_list); e = list_next(e)) {
+
+  struct thread *t = thread_current();
+  uint32_t *pd = t->pagedir;
+  struct hash *spt = t->spt;
+  spte *spte_cur = spt_getSpte(spt, clk_frame_ptr->page_addr);
+  ASSERT(spte_cur != NULL);
+  void *ret = NULL;
+  
+  /*clk_frame_ptr -> end -> beginning -> clk_frame_ptr - 1*/
+  for(e = &clk_frame_ptr->elem; 
+      list_next(e) != &clk_frame_ptr->elem; 
+      e = (e == list_end(&frame_list))? list_begin(&frame_list): list_next(e)) {
     struct frame *fp = list_entry(e, struct frame, elem);
-    if (fp->LRU_bit == 0){
-      fp->LRU_bit = 1;
+    if(!pagedir_is_accessed(pd, (const void*) fp->page_addr)) {
+      if(!spte_cur->isPinned) { /*found a frame to evict. Throw current frame into swap*/
+	spte_cur->page_loc = PAGE_IN_SWAP;
+	spte_cur->swap_i = swap_frame(fp->page_addr);
+	ret = fp->page_addr;
+      }
     } else {
-      //TODO: evict this frame
-
-
-
-      lock_release(&frame_lock);
-      return;
+      pagedir_set_accessed(pd, spte_cur->vaddr, true);
     }
   }
 
-  //wrap the list back to beginning(full circular check)
-  for (e = list_begin(&frame_list); e != &cur_frame_ptr->elem; e = list_next(e)){
-    struct frame *fp = list_entry(e, struct frame, elem);
-    if (fp->LRU_bit == 0){
-      fp->LRU_bit = 1;
-    } else {
-      //TODO: evict this frame
+  if(!pagedir_is_accessed(pd, (const void*) clk_frame_ptr->page_addr)
+     && !spte_cur->isPinned) {
+    
 
-
-      lock_release(&frame_lock);
-      return;
-    }
   }
+
+  lock_release(&frame_lock);
 }
