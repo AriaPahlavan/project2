@@ -21,7 +21,6 @@ pagedir_create (void)
     memcpy (pd, init_page_dir, PGSIZE);
   return pd;
 }
-
 /* Destroys page directory PD, freeing all the pages it
    references. */
 void

@@ -59,6 +59,16 @@ is_user_vaddr (const void *vaddr)
   return vaddr < PHYS_BASE;
 }
 
+/* Returns true if VADDR is within user stack. */
+#ifndef ulimit
+#define ulimit (PHYS_BASE - (PGSIZE << 11)) /*default 8 MB*/
+#endif
+static inline bool
+is_user_stack_access (const void *vaddr) 
+{
+  return vaddr < PHYS_BASE && vaddr > ulimit;
+}
+
 /* Returns true if VADDR is a kernel virtual address. */
 static inline bool
 is_kernel_vaddr (const void *vaddr) 

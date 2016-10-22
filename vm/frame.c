@@ -46,8 +46,8 @@ void* get_frame(void){
     struct frame* fp = list_entry(e, struct frame, elem);
     if (!fp->valid){ /* current frame not inuse*/
       fp->valid = true;
-      lock_release(&frame_lock);
       ret = fp->page_addr;
+      lock_release(&frame_lock);
     }
   }
     /*
@@ -57,10 +57,11 @@ void* get_frame(void){
 
   /*TEMP*/
   if(!ret) {
-    debug_panic("frame.c", "58", "get_frame", "Temporary kernel panic until swapping is implemented");
+    debug_panic("frame.c", 58, "get_frame", "Temporary kernel panic until swapping is implemented");
   }
   /*TEMP */
 
+  return ret;
 }
 
 void free_frame(void* pa) {
@@ -106,7 +107,7 @@ static void evict_frame(void){
   }
 
   //wrap the list back to beginning(full circular check)
-  for (e = list_begin(&frame_list); e != cur_frame_ptr; e = list_next(e)){
+  for (e = list_begin(&frame_list); e != &cur_frame_ptr->elem; e = list_next(e)){
     struct frame *fp = list_entry(e, struct frame, elem);
     if (fp->LRU_bit == 0){
       fp->LRU_bit = 1;

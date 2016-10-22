@@ -104,6 +104,8 @@ struct thread
     
     struct hash *spt; /*supplementary page table*/
 
+    void *esp;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */

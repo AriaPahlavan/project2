@@ -2,9 +2,15 @@
 #include "userprog/syscall.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include "userprog/pagedir.h"
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+
+#include <hash.h>
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -150,18 +156,37 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  if(!user) { /*according to the pintos documentation for userprog. This may need to change for vm.*/
-    f->eip = f->eax;
-    f->eax = 0xffffffff;
+  struct thread *t = thread_current ();
+  struct hash *spt_cur = t->spt;
+  spte *s = spt_getSpte(spt_cur, (const void*) fault_addr);
+
+  bool valid = false;
+  /*check that fault_addr is a valid address and not an illegal write. 
+    If the access is attempting to write below the stack, kill it. */
+  if(is_user_vaddr(fault_addr) && user) {
+    if(not_present) {
+      if(is_user_stack_access(fault_addr)) {
+	if(write) {
+	  if(fault_addr < t->esp) { /*a user access should not be writing below the stack pointer*/
+	    kill(f);
+	    return;
+	  }
+	}
+      }
+      
+      /* Verify that there's not already a page at that virtual
+	 address, then map our page there. */
+      if(!(pagedir_get_page (t->pagedir, fault_addr) == NULL
+	   && pagedir_set_page (t->pagedir, fault_addr, get_frame(), true)
+	   && !spt_addSpte(t->spt, (const void*) fault_addr))) {
+	debug_panic("exception.c", 172, "page_fault", "failed to allocate new frame");
+      }
+    }
+  } else if(user) {
+    kill(f);
     return;
   } else {
-    /*check that fault_addr is a valid address. If not, kill the process.*/
-    if(is_user_vaddr(fault_addr)) {
-      /*load a frame with the needed data*/
-      current_thread()->s_pt
-    } else {
-      kill(f);
-    }
+    /*TODO - need to figure out what to do for kernel pagefault*/
   }
 }
 
