@@ -159,34 +159,35 @@ page_fault (struct intr_frame *f)
   struct thread *t = thread_current ();
   struct hash *spt_cur = t->spt;
   spte *s = spt_getSpte(spt_cur, (const void*) fault_addr);
+  if(!s) {
+    s = spt_addSpte(spt_cur, (const void*) fault_addr);
+  }
 
-  bool valid = false;
   /*check that fault_addr is a valid address and not an illegal write. 
     If the access is attempting to write below the stack, kill it. */
-  if(is_user_vaddr(fault_addr) && user) {
-    if(not_present) {
-      if(is_user_stack_access(fault_addr)) {
-	if(write) {
-	  if(fault_addr < t->esp) { /*a user access should not be writing below the stack pointer*/
-	    kill(f);
-	    return;
-	  }
-	}
-      }
+  /* if(is_user_vaddr(fault_addr) && user) { */
+  /*   if(not_present) { */
+  /*     if(is_user_stack_access(fault_addr)) { */
+  /* 	if(write) { */
+  /* 	  if(fault_addr < t->esp) { /\*a user access should not be writing below the stack pointer*\/ */
+  /* 	    /\*kill(f);*\/ */
+  /* 	    return; */
+  /* 	  } */
+  /* 	} */
+  /*     } */
       
-      /* Verify that there's not already a page at that virtual
-	 address, then map our page there. */
-      if(!(pagedir_get_page (t->pagedir, fault_addr) == NULL
-	   && pagedir_set_page (t->pagedir, fault_addr, get_frame(), true)
-	   && !spt_addSpte(t->spt, (const void*) fault_addr))) {
+  /*     /\* Verify that there's not already a page at that virtual */
+  /* 	 address, then map our page there. *\/ */
+      if(pagedir_get_page (t->pagedir, fault_addr) == NULL
+	 && pagedir_set_page (t->pagedir, fault_addr, get_frame(), true)) { /*need to determine how to know whether a page should be writable*/
 	debug_panic("exception.c", 172, "page_fault", "failed to allocate new frame");
       }
-    }
-  } else if(user) {
-    kill(f);
-    return;
-  } else {
-    /*TODO - need to figure out what to do for kernel pagefault*/
-  }
+  /*   } */
+  /* } else if(user) { */
+  /*   /\* kill(f); *\/ */
+  /*   return; */
+  /* } else { */
+  /*   /\*TODO - need to figure out what to do for kernel pagefault*\/ */
+  /* } */
 }
 

@@ -1,17 +1,20 @@
 #include <stdint.h>
+#include <list.h>
 #include <hash.h>
 
 typedef enum enum_page_loc_t {
+  PAGE_NOWHERE, /*default location when a spte is first created*/
   PAGE_IN_MEM,
   PAGE_IN_SWAP,
   PAGE_IN_DSK
 } page_loc_t;
 
 typedef struct struct_spte {
-  struct hash_elem elem;
+  struct list_elem list_elem;
+  struct hash_elem hash_elem;
   size_t swap_i;
   void *vaddr;
-  page_loc_t page_loc; /*location of the page data*/
+  page_loc_t page_loc;
   bool isPinned; /*keeps the frame from being evicted in case a syscall needs a
 		  guarantee that the frame will not be invalidated*/
 } spte;
