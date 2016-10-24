@@ -190,6 +190,7 @@ page_fault (struct intr_frame *f)
     case PAGE_IN_SWAP:
       lock_acquire(&pf_lock);
       restore_frame(frame_addr, s->swap_i);
+      notify_frame_in_mem(frame_addr);
       lock_release(&pf_lock);
       break;
     case PAGE_IN_DSK:
@@ -197,11 +198,13 @@ page_fault (struct intr_frame *f)
       file_seek(t->executable, s->ofs);
       file_read(t->executable, frame_addr, s->read_bytes);
       memset(frame_addr + s->read_bytes, 0, s->zero_bytes);
+      notify_frame_in_mem(frame_addr);
       lock_release(&pf_lock);
       break;
     default:
       lock_acquire(&pf_lock);
       memset(frame_addr, 0, PGSIZE);
+      notify_frame_in_mem(frame_addr);
       lock_release(&pf_lock);
       break;
   }

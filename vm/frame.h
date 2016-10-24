@@ -22,4 +22,6 @@ void free_frame(void* pa);
 
 struct frame* find_frame(void* pa);
 
+void notify_frame_in_mem(void *pa);
+
 #endif /*vm/frame.h*/

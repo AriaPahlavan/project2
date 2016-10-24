@@ -47,8 +47,7 @@ void* get_frame(spte* spte_cur){
   void* ret = NULL;
 
   lock_acquire(&frame_lock);
-  
-  
+    
   for(e = list_begin(&frame_list); e!= list_end(&frame_list); e = list_next(e)){
     struct frame* fp = list_entry(e, struct frame, elem);
     if (!fp->valid){ /* current frame not inuse*/
@@ -107,14 +106,27 @@ struct frame* find_frame(void* pa){
   return NULL;
 }
 
+void notify_frame_in_mem(void *pa) {
+  lock_acquire(&frame_lock);
+  struct frame *fp = find_frame(pa);
+  struct list_elem *pgs;
+
+  lock_acquire(&fp->pages_lock);
+  for(pgs = list_begin(&fp->pages); pgs != list_end(&fp->pages); pgs = list_next(pgs)) {
+    spte *spte_cur = list_entry(pgs, spte, list_elem);
+    if(spte_cur) {
+      spte_cur->page_loc = PAGE_IN_MEM;
+    }
+  }
+  lock_release(&fp->pages_lock);
+  lock_release(&frame_lock);
+}
 
 //TODO: following function is not complete. The LRU algorithm to find the frame to be evicted is implemented; not yet implement how to actually evict the frame(just remove from list and call palloc?). Feel free to rewrite or change the function accordingly
 
 static struct frame *evict_frame(void){
   //set current frame LRU bit to 0
   if (clk_frame_ptr == NULL) clk_frame_ptr = list_entry(list_begin(&frame_list), struct frame, elem);
-
-  lock_acquire(&frame_lock);
 
   struct thread *t = thread_current();
   uint32_t *pd = t->pagedir;
@@ -164,7 +176,6 @@ static struct frame *evict_frame(void){
       break;
     }
   }
-  lock_release(&frame_lock);
 
   return ret;
 }
