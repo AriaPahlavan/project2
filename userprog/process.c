@@ -45,7 +45,7 @@ void child_delete(child *c);
 
 child *child_new(const char *prog) {
   child *c = (child*) malloc(sizeof(child));
-  c->prog = (char*) get_frame();
+  c->prog = (char *) malloc(sizeof(char) * strlen(prog) + 2);
   c->sema = (struct semaphore*) malloc(sizeof(struct semaphore));
   int argvMAX = 40;
   c->argv = (char**) malloc(sizeof(char*) * 40); /* "40" needs to be changed*/
@@ -91,8 +91,7 @@ void child_delete(child *c) {
     return;
   }
 
-  free_frame (c->prog);
-
+  free(c->prog);
   free(c->sema);
   free(c->argv);
   free(c);
@@ -350,7 +349,7 @@ typedef uint16_t Elf32_Half;
 /* Executable header.  See [ELF1] 1-4 to 1-8.
    This appears at the very beginning of an ELF binary. */
 struct Elf32_Ehdr
-  {
+   {
     unsigned char e_ident[16];
     Elf32_Half    e_type;
     Elf32_Half    e_machine;
@@ -594,6 +593,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  struct thread *t = thread_current();
+  struct hash *spt = t->spt;
+  
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0)
     {
@@ -603,26 +605,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      uint8_t *kpage = get_frame ();
-      if (kpage == NULL)
-        return false;
-
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          free_frame (kpage);
-          return false;
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable))
-        {
-          free_frame (kpage);
-          return false;
-        }
-
+      spt_addSpte(spt, (void*) upage);
+      spte *spte_cur = spt_getSpte(spt, (void*) upage);
+      
+      spte_cur->page_loc = PAGE_IN_DSK;
+      spte_cur->read_bytes = page_read_bytes;
+      spte_cur->zero_bytes = page_zero_bytes;
+      spte_cur->ofs = ofs;
+      spte_cur->isWritable = writable;
+      
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -643,16 +634,27 @@ setup_stack (void **esp, const child *cp)
 {
   uint8_t *kpage;
   bool success = false;
+  void *uaddr = PHYS_BASE - PGSIZE;
 
-  kpage = get_frame ();
+  kpage = get_frame (uaddr);
   if (kpage != NULL)
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      struct thread *t = thread_current();
+      struct hash *spt = t->spt;
+
+      spt_addSpte(spt, uaddr);
+      spte *spte_cur = spt_getSpte(spt, uaddr);
+      spte_cur->page_loc = PAGE_IN_MEM;
+      spte_cur->isWritable = true;
+
+      success = install_page (uaddr, kpage, true);
       if (success)
         *esp = PHYS_BASE;
       else
         free_frame (kpage);
     }
+
+  
 
   mp.c = (char*) PHYS_BASE - 1;
   /*@Nico: all of these variables created here can be part of child struct*/
@@ -725,6 +727,5 @@ install_page (void *upage, void *kpage, bool writable)
   /* Verify that there's not already a page at that virtual
      address, then map our page there. */
   return (pagedir_get_page (t->pagedir, upage) == NULL
-          && pagedir_set_page (t->pagedir, upage, kpage, writable)
-	  && !spt_addSpte(t->spt, (const void*) upage)); /*This will likely need to be modified. For now, I'll just retain a copy of the */
+          && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }

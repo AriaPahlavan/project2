@@ -1,5 +1,5 @@
 #include <list.h>
-
+#include <string.h>
 #include "lib/debug.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -18,6 +18,7 @@ static struct list frame_list;
 static struct list_elem *e;
 static struct frame *clk_frame_ptr;
 
+static void *alloc_frame(struct frame *fp, spte *spte_cur);
 static struct frame *evict_frame(void);
 
 void frame_init(void){
@@ -42,24 +43,37 @@ void frame_init(void){
   clk_frame_ptr = NULL;
 }
 
-void* get_frame(void){
+void* get_frame(spte* spte_cur){
   void* ret = NULL;
 
   lock_acquire(&frame_lock);
-
+  
+  
   for(e = list_begin(&frame_list); e!= list_end(&frame_list); e = list_next(e)){
     struct frame* fp = list_entry(e, struct frame, elem);
     if (!fp->valid){ /* current frame not inuse*/
       fp->valid = true;
-      ret = fp->page_addr;
+      ret = alloc_frame(fp, spte_cur);
       lock_release(&frame_lock);
     }
   }
     
   if(!ret) {
+    struct frame *ret_fp = evict_frame();
+    ret_fp->valid = true;
+    ret = alloc_frame(ret_fp, spte_cur);
     lock_release(&frame_lock);
-    ret = evict_frame()->page_addr;
   }
+
+  return ret;
+}
+
+static void *alloc_frame(struct frame *fp, spte *spte_cur) {
+  void *ret = fp->page_addr;
+  fp->valid = true;
+  lock_acquire(&fp->pages_lock);
+  list_push_back(&fp->pages, &spte_cur->list_elem);
+  lock_release(&fp->pages_lock);
 
   return ret;
 }
@@ -69,6 +83,17 @@ void free_frame(void* pa) {
   struct frame* fp = find_frame(pa);
   if (fp == NULL) return;
   fp->valid = false;
+  struct list_elem *pgs;
+  lock_acquire(&fp->pages_lock);
+  for(pgs = list_begin(&fp->pages); pgs != list_end(&fp->pages); pgs = list_next(pgs)) {
+    spte *spte_cur = list_entry(pgs, spte, list_elem);
+    if(spte_cur) {
+      spte_cur->page_loc = PAGE_NOWHERE;
+      list_remove(&spte_cur->list_elem);
+    }
+  }
+
+  lock_release(&fp->pages_lock);
   lock_release(&frame_lock);
 }
 
@@ -135,20 +160,10 @@ static struct frame *evict_frame(void){
     
     pagedir_set_accessed(pd, spte_cur->vaddr, true);
     if(ret != NULL) {
+      fp->valid = true;
       break;
     }
   }
-
-  switch(spte_cur->page_loc) {
-    case PAGE_IN_SWAP:
-      restore_frame(ret->page_addr, spte_cur->swap_i);
-      break;
-    default: /*TODO - figure out what to do when the data is in the executable*/
-      break;
-  }
-
-  spte_cur->page_loc = PAGE_IN_MEM;
-
   lock_release(&frame_lock);
 
   return ret;

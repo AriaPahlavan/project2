@@ -32,6 +32,10 @@ static spte *spte_new(const void *vaddr) {
   s->page_loc = PAGE_NOWHERE;
   s->isPinned = false;
   s->swap_i = -1;
+  s->read_bytes = -1;
+  s->zero_bytes = -1;
+  s->ofs = -1;
+  s->isWritable = false;
   return s;
 }
 

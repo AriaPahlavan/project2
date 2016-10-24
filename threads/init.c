@@ -39,6 +39,7 @@
 #endif
 
 #include "vm/frame.h"
+#include "vm/swap.h"
 
 /* Page directory with kernel mappings only. */
 uint32_t *init_page_dir;
@@ -117,10 +118,7 @@ main (void)
   exception_init ();
   syscall_init ();
 #endif
-
-  /*initialize frame table*/
-  frame_init();
-
+  
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
   serial_init_queue ();
@@ -132,6 +130,11 @@ main (void)
   locate_block_devices ();
   filesys_init (format_filesys);
 #endif
+
+  /*initialize frame table*/
+  frame_init();
+  /*initialize swap table*/
+  swap_init();
 
   printf ("Boot complete.\n");
   

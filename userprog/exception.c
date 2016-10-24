@@ -2,15 +2,20 @@
 #include "userprog/syscall.h"
 #include <inttypes.h>
 #include <stdio.h>
+#include <string.h>
 #include "userprog/pagedir.h"
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/swap.h"
 #include "vm/frame.h"
 #include "vm/page.h"
 
 #include <hash.h>
+
+static struct lock pf_lock;
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -65,6 +70,8 @@ exception_init (void)
      We need to disable interrupts for page faults because the
      fault address is stored in CR2 and needs to be preserved. */
   intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
+
+  lock_init(&pf_lock);
 }
 
 /* Prints exception statistics. */
@@ -156,38 +163,47 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  struct thread *t = thread_current ();
+  struct thread *t = thread_current();
   struct hash *spt_cur = t->spt;
   spte *s = spt_getSpte(spt_cur, (const void*) fault_addr);
   if(!s) {
     s = spt_addSpte(spt_cur, (const void*) fault_addr);
+    s->isWritable = true; /*probably true. Code definitely can't be added if there isn't already an spte allocated for it*/
+  } else if((!s->isWritable) && write) {
+    kill(f);
   }
 
-  /*check that fault_addr is a valid address and not an illegal write. 
-    If the access is attempting to write below the stack, kill it. */
-  /* if(is_user_vaddr(fault_addr) && user) { */
-  /*   if(not_present) { */
-  /*     if(is_user_stack_access(fault_addr)) { */
-  /* 	if(write) { */
-  /* 	  if(fault_addr < t->esp) { /\*a user access should not be writing below the stack pointer*\/ */
-  /* 	    /\*kill(f);*\/ */
-  /* 	    return; */
-  /* 	  } */
-  /* 	} */
-  /*     } */
+  /* check that fault_addr is a valid address and not an illegal write. z */
+  /* If the access is attempting to write below the stack, kill it. */
+
       
-  /*     /\* Verify that there's not already a page at that virtual */
-  /* 	 address, then map our page there. *\/ */
-      if(pagedir_get_page (t->pagedir, fault_addr) == NULL
-	 && pagedir_set_page (t->pagedir, fault_addr, get_frame(), true)) { /*need to determine how to know whether a page should be writable*/
-	debug_panic("exception.c", 172, "page_fault", "failed to allocate new frame");
-      }
-  /*   } */
-  /* } else if(user) { */
-  /*   /\* kill(f); *\/ */
-  /*   return; */
-  /* } else { */
-  /*   /\*TODO - need to figure out what to do for kernel pagefault*\/ */
-  /* } */
+  /* Verify that there's not already a page at that virtual */
+  /* address, then map our page there. */
+  void *page_addr = pg_round_down(fault_addr);
+  void *frame_addr = get_frame(s);
+  if(pagedir_get_page (t->pagedir, page_addr) == NULL
+     && pagedir_set_page (t->pagedir, page_addr, frame_addr, s->isWritable)) { /*need to determine how to know whether a page should be writable*/
+    debug_panic("exception.c", 172, "page_fault", "failed to allocate new frame");
+  }
+
+  switch(s->page_loc) {
+    case PAGE_IN_SWAP:
+      lock_acquire(&pf_lock);
+      restore_frame(frame_addr, s->swap_i);
+      lock_release(&pf_lock);
+      break;
+    case PAGE_IN_DSK:
+      lock_acquire(&pf_lock);
+      file_seek(t->executable, s->ofs);
+      file_read(t->executable, frame_addr, s->read_bytes);
+      memset(frame_addr + s->read_bytes, 0, s->zero_bytes);
+      lock_release(&pf_lock);
+      break;
+    default:
+      lock_acquire(&pf_lock);
+      memset(frame_addr, 0, PGSIZE);
+      lock_release(&pf_lock);
+      break;
+  }
 }
 
