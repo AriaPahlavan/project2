@@ -603,6 +603,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
+      if(read_bytes < PGSIZE) {
+	t->end = (void*) ((uint8_t*) upage + page_read_bytes);
+      }
+
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       spt_addSpte(spt, (void*) upage);

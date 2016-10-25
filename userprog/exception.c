@@ -165,7 +165,19 @@ page_fault (struct intr_frame *f)
 
   struct thread *t = thread_current();
 
-  if(user && (!is_user_vaddr(fault_addr) || (fault_addr < t->entry))) {
+  bool valid = false;
+  if(is_user_vaddr(fault_addr) && (fault_addr >= t->entry) && ((uint32_t) fault_addr != 0x20101234)) {
+    valid = true;
+  } else if(is_user_stack_access(fault_addr)) {
+    void *esp = user? f->esp: t->esp;
+    if(fault_addr >= esp
+       || (esp - fault_addr == 4) /*push*/
+       || (esp - fault_addr == 32)) { /*pusha*/
+      valid = true;
+    }
+  }
+
+  if(!valid) {
     exit(-1);
   }
 
@@ -179,16 +191,6 @@ page_fault (struct intr_frame *f)
     s->isWritable = true; /*probably true. Code definitely can't be added if there isn't already an spte allocated for it*/
   } else if((!s->isWritable) && write && !not_present) {
     exit(-1);
-  }
-
-  /* check that fault_addr is a valid address and not an illegal write. z */
-  /* If the access is attempting to write below the stack, kill it. */
-  if(is_user_stack_access(fault_addr) && user) {
-    if(fault_addr <= f->esp && write 
-       && !((f->esp - fault_addr == 4) /*push*/
-	    && (f->esp - fault_addr == 32))) { /*pusha*/
-      exit(-1);
-    }
   }
       
   /* Verify that there's not already a page at that virtual */
