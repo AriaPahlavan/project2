@@ -56,11 +56,11 @@ void restore_frame(void* page_ptr, size_t swap_index){
   lock_release(&swap_lock);
 }
 
-/* void free_frame(size_t swap_index){ */
-/*   lock_acquire(&swap_lock); */
-/*   if (swap_index >= swap_size) exit(-1); */
-/*   /\*reclaim free swap slot*\/ */
-/*   bitmap_set(swap_bm,swap_index,false); */
-/*   lock_release(&swap_lock); */
-/* } */
+void free_swap(size_t swap_index){
+  lock_acquire(&swap_lock);
+  if (swap_index >= swap_size) exit(-1);
+  /*reclaim free swap slot*/
+  bitmap_set(swap_bm,swap_index,false);
+  lock_release(&swap_lock);
+}
 

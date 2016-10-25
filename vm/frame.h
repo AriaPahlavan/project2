@@ -18,7 +18,7 @@ void frame_init(void);
 
 void* get_frame(spte *spte_cur);
 
-void free_frame(void* pa);
+void free_frame(spte *spte_cur);
 
 struct frame* find_frame(void* pa);
 

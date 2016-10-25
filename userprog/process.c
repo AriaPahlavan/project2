@@ -654,8 +654,10 @@ setup_stack (void **esp, const child *cp)
   success = install_page (pg_round_down(uaddr), kpage, true);
   if (success)
     *esp = PHYS_BASE;
-  else
-    free_frame (kpage);
+  else {
+    free_frame (spte_cur);
+    spt_deleteSpte(spt, pg_round_down(uaddr));
+  }
 
   
 

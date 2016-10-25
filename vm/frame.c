@@ -78,11 +78,34 @@ static void *alloc_frame(struct frame *fp, spte *spte_cur) {
   return ret;
 }
 
-void free_frame(void* pa) {
+void free_frame(spte *spte_cur) {
   lock_acquire(&frame_lock);
-  struct frame* fp = find_frame(pa);
-  if (fp == NULL) return;
-  fp->valid = false;
+
+  struct thread *t = thread_current();
+  struct frame* fp = find_frame(pagedir_get_page(t->pagedir, spte_cur->vaddr));
+  if (fp == NULL) {
+    lock_release(&frame_lock);
+    return;
+  }
+
+  /*call sema_try_up here (call sema_down in a syscall)*/
+
+  switch(spte_cur->page_loc) {
+    case PAGE_IN_SWAP:
+      free_swap(spte_cur->swap_i);
+    default:
+      fp->valid = false;
+      /*another case could have been a memory mapped file (dirty frame would need to be written back to fs on an exit(0).*/
+  }
+
+  /*TODO handle a pinned frame. It should not be deallocated in case there
+   is a system call that depends on the frame being present in memory.
+   Right now isPinned is just a boolean, but that may need to actually be
+   a semaphore, since if a frame needs to be freed, it should wait for any
+   pending syscalls to complete that depend on the frame.
+
+   -- may need to move isPinned semaphore to the frame instead of the spte*/
+
   struct list_elem *pgs;
   lock_acquire(&fp->pages_lock);
   for(pgs = list_begin(&fp->pages); pgs != list_end(&fp->pages); pgs = list_next(pgs)) {

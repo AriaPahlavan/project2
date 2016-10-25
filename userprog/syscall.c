@@ -12,10 +12,13 @@
 #include "../filesys/file.h"
 #include "../filesys/filesys.h"
 #include "process.h"
+#include "userprog/pagedir.h"
 #include "../devices/shutdown.h"
 #include "../devices/input.h"
 #include "../threads/malloc.h"
 #include "../threads/vaddr.h"
+#include "vm/frame.h"
+#include "vm/page.h"
 
 #define max_param 3
 int syscall_param[max_param];
@@ -225,7 +228,8 @@ void halt(void){
 }
 
 void exit(int status) {
-  thread_current()->exit_status = status;
+  struct thread *t = thread_current();
+  t->exit_status = status;
 
   /*close same file in linklist, call close function*/
   for(e = list_begin(&open_file_list);e != list_end(&open_file_list);e = list_next(e))  {
@@ -234,6 +238,20 @@ void exit(int status) {
       close(fp->fd);
       break;
     }
+  }
+  
+  /*release the filysys lock if needed (may not have been released due to page fault)*/
+  if(lock_held_by_current_thread(&lock_filesys)) {
+    lock_release(&lock_filesys);
+  }
+
+  struct hash *spt = t->spt;
+  struct hash_iterator spte_i;
+  hash_first(&spte_i, spt);
+  while(hash_next(&spte_i)) {
+    spte *spte_cur = hash_entry(hash_cur(&spte_i), spte, hash_elem);
+
+    free_frame(spte_cur);
   }
 
   thread_exit();
