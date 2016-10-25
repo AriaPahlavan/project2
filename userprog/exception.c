@@ -163,26 +163,38 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  if(user && !is_user_vaddr(fault_addr)) {
+    exit(-1);
+  }
+
+  void *page_addr = pg_round_down(fault_addr);
+
   struct thread *t = thread_current();
   struct hash *spt_cur = t->spt;
-  spte *s = spt_getSpte(spt_cur, (const void*) fault_addr);
+  spte *s = spt_addSpte(spt_cur, (const void*) page_addr);
   if(!s) {
-    s = spt_addSpte(spt_cur, (const void*) fault_addr);
+    s = spt_getSpte(spt_cur, (const void*) page_addr);
+    s->vaddr = page_addr;
     s->isWritable = true; /*probably true. Code definitely can't be added if there isn't already an spte allocated for it*/
-  } else if((!s->isWritable) && write) {
-    kill(f);
+  } else if((!s->isWritable) && write && !not_present) {
+    exit(-1);
   }
 
   /* check that fault_addr is a valid address and not an illegal write. z */
   /* If the access is attempting to write below the stack, kill it. */
-
+  if(is_user_stack_access(fault_addr) && user) {
+    if(fault_addr <= f->esp && write 
+       && !((f->esp - fault_addr == 4) /*push*/
+	    && (f->esp - fault_addr == 32))) { /*pusha*/
+      exit(-1);
+    }
+  }
       
   /* Verify that there's not already a page at that virtual */
   /* address, then map our page there. */
-  void *page_addr = pg_round_down(fault_addr);
   void *frame_addr = get_frame(s);
-  if(pagedir_get_page (t->pagedir, page_addr) == NULL
-     && pagedir_set_page (t->pagedir, page_addr, frame_addr, s->isWritable)) { /*need to determine how to know whether a page should be writable*/
+  if(!(pagedir_get_page (t->pagedir, page_addr) == NULL
+       && pagedir_set_page (t->pagedir, page_addr, frame_addr, s->isWritable))) { /*need to determine how to know whether a page should be writable*/
     debug_panic("exception.c", 172, "page_fault", "failed to allocate new frame");
   }
 
@@ -195,8 +207,7 @@ page_fault (struct intr_frame *f)
       break;
     case PAGE_IN_DSK:
       lock_acquire(&pf_lock);
-      file_seek(t->executable, s->ofs);
-      file_read(t->executable, frame_addr, s->read_bytes);
+      file_read_at(t->executable, frame_addr, (off_t) s->read_bytes, s->ofs);
       memset(frame_addr + s->read_bytes, 0, s->zero_bytes);
       notify_frame_in_mem(frame_addr);
       lock_release(&pf_lock);

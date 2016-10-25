@@ -617,6 +617,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
+      ofs += page_read_bytes;
       upage += PGSIZE;
     }
   return true;
@@ -636,23 +637,21 @@ setup_stack (void **esp, const child *cp)
   bool success = false;
   void *uaddr = PHYS_BASE - PGSIZE;
 
-  kpage = get_frame (uaddr);
-  if (kpage != NULL)
-    {
-      struct thread *t = thread_current();
-      struct hash *spt = t->spt;
+  struct thread *t = thread_current();
+  struct hash *spt = t->spt;
 
-      spt_addSpte(spt, uaddr);
-      spte *spte_cur = spt_getSpte(spt, uaddr);
-      spte_cur->page_loc = PAGE_IN_MEM;
-      spte_cur->isWritable = true;
+  spt_addSpte(spt, pg_round_down(uaddr));
+  spte *spte_cur = spt_getSpte(spt, pg_round_down(uaddr));
+  spte_cur->page_loc = PAGE_IN_MEM;
+  spte_cur->isWritable = true;
 
-      success = install_page (uaddr, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
-      else
-        free_frame (kpage);
-    }
+  kpage = get_frame (spte_cur);
+
+  success = install_page (pg_round_down(uaddr), kpage, true);
+  if (success)
+    *esp = PHYS_BASE;
+  else
+    free_frame (kpage);
 
   
 

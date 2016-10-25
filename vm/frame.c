@@ -54,6 +54,7 @@ void* get_frame(spte* spte_cur){
       fp->valid = true;
       ret = alloc_frame(fp, spte_cur);
       lock_release(&frame_lock);
+      break;
     }
   }
     

@@ -131,10 +131,12 @@ main (void)
   filesys_init (format_filesys);
 #endif
 
+#ifdef VM
   /*initialize frame table*/
   frame_init();
   /*initialize swap table*/
   swap_init();
+#endif
 
   printf ("Boot complete.\n");
   
