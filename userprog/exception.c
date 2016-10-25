@@ -163,13 +163,14 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  if(user && !is_user_vaddr(fault_addr)) {
+  struct thread *t = thread_current();
+
+  if(user && (!is_user_vaddr(fault_addr) || (fault_addr < t->entry))) {
     exit(-1);
   }
 
   void *page_addr = pg_round_down(fault_addr);
 
-  struct thread *t = thread_current();
   struct hash *spt_cur = t->spt;
   spte *s = spt_addSpte(spt_cur, (const void*) page_addr);
   if(!s) {

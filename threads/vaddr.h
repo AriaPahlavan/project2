@@ -61,7 +61,7 @@ is_user_vaddr (const void *vaddr)
 
 /* Returns true if VADDR is within user stack. */
 #ifndef ulimit
-#define ulimit (PHYS_BASE - (PGSIZE << 11)) /*default 8 MB*/
+#define ulimit (PHYS_BASE - (1 << 23)) /*default 8 MB*/
 #endif
 static inline bool
 is_user_stack_access (const void *vaddr) 

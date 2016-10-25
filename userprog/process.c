@@ -511,7 +511,7 @@ load (const child *childProcess, void (**eip) (void), void **esp)
     goto done;
 
   /* Start address. */
-  *eip = (void (*) (void)) ehdr.e_entry;
+  t->entry  = *eip = (void (*) (void)) ehdr.e_entry;
 
   success = true;
 
