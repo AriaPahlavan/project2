@@ -239,7 +239,7 @@ void exit(int status) {
       break;
     }
   }
-  
+
   /*release the filysys lock if needed (may not have been released due to page fault)*/
   if(lock_held_by_current_thread(&lock_filesys)) {
     lock_release(&lock_filesys);
@@ -251,8 +251,10 @@ void exit(int status) {
   while(hash_next(&spte_i)) {
     spte *spte_cur = hash_entry(hash_cur(&spte_i), spte, hash_elem);
 
+    pagedir_clear_page(t->pagedir, spte_cur->vaddr);
     free_frame(spte_cur);
   }
+  spt_delete(spt);
 
   thread_exit();
 }
