@@ -166,7 +166,7 @@ page_fault (struct intr_frame *f)
   struct thread *t = thread_current();
 
   bool valid = false;
-  if(is_user_vaddr(fault_addr) && (fault_addr >= t->entry) && ((uint32_t) fault_addr != 0x20101234)) {
+  if(is_user_vaddr(fault_addr) && (fault_addr >= t->entry) && user && not_present) {
     valid = true;
   } else if(is_user_stack_access(fault_addr)) {
     void *esp = user? f->esp: t->esp;
