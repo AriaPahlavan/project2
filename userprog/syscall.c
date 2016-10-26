@@ -25,8 +25,6 @@ int syscall_param[max_param];
 
 unsigned fd_counter;
 
-struct lock lock_filesys;
-
 struct file_def* find_file_def(int fd);
 
 bool create(const char* file, unsigned initial_size);

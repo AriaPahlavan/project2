@@ -142,6 +142,11 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   void *fault_addr;  /* Fault address. */
 
+  if(lock_held_by_current_thread(&lock_filesys)) {
+    lock_release(&lock_filesys);
+  }
+
+
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
      data.  It is not necessarily the address of the instruction
