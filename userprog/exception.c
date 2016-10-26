@@ -39,7 +39,7 @@ static void page_fault (struct intr_frame *);
    Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
    Reference" for a description of each of these exceptions. */
 void
-exception_init (void) 
+exception_init (void)
 {
   /* These exceptions can be raised explicitly by a user program,
      e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
@@ -76,14 +76,14 @@ exception_init (void)
 
 /* Prints exception statistics. */
 void
-exception_print_stats (void) 
+exception_print_stats (void)
 {
   printf ("Exception: %lld page faults\n", page_fault_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */
 static void
-kill (struct intr_frame *f) 
+kill (struct intr_frame *f)
 {
   /* This interrupt is one (probably) caused by a user process.
      For example, the process might have tried to access unmapped
@@ -92,7 +92,7 @@ kill (struct intr_frame *f)
      the kernel.  Real Unix-like operating systems pass most
      exceptions back to the process via signals, but we don't
      implement them. */
-     
+
   /* The interrupt frame's code segment value tells us where the
      exception originated. */
   switch (f->cs)
@@ -112,7 +112,7 @@ kill (struct intr_frame *f)
          may cause kernel exceptions--but they shouldn't arrive
          here.)  Panic the kernel to make the point.  */
       intr_dump_frame (f);
-      PANIC ("Kernel bug - unexpected interrupt in kernel"); 
+      PANIC ("Kernel bug - unexpected interrupt in kernel");
 
     default:
       /* Some other code segment?  Shouldn't happen.  Panic the
@@ -135,7 +135,7 @@ kill (struct intr_frame *f)
    description of "Interrupt 14--Page Fault Exception (#PF)" in
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
-page_fault (struct intr_frame *f) 
+page_fault (struct intr_frame *f)
 {
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
@@ -194,10 +194,13 @@ page_fault (struct intr_frame *f)
   } else if((!s->isWritable) && write && !not_present) {
     exit(-1);
   }
-      
+  s->isPinned = true;
+
+
   /* Verify that there's not already a page at that virtual */
   /* address, then map our page there. */
   void *frame_addr = get_frame(s);
+
   if(!(pagedir_get_page (t->pagedir, page_addr) == NULL
        && pagedir_set_page (t->pagedir, page_addr, frame_addr, s->isWritable))) { /*need to determine how to know whether a page should be writable*/
     debug_panic("exception.c", 172, "page_fault", "failed to allocate new frame");
@@ -224,5 +227,5 @@ page_fault (struct intr_frame *f)
       lock_release(&pf_lock);
       break;
   }
+  s->isPinned = false;
 }
-

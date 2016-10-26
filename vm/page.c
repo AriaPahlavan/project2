@@ -91,7 +91,7 @@ void spt_delete(struct hash *spt) {
 
 spte *spt_addSpte(struct hash *spt, const void *vaddr) {
   spte *s = spte_new(vaddr);
-  
+
   struct hash_elem *e = hash_insert(spt, &s->hash_elem);
   if(e) {
     spte_delete(s);

@@ -47,7 +47,7 @@ void* get_frame(spte* spte_cur){
   void* ret = NULL;
 
   lock_acquire(&frame_lock);
-    
+
   for(e = list_begin(&frame_list); e!= list_end(&frame_list); e = list_next(e)){
     struct frame* fp = list_entry(e, struct frame, elem);
     if (!fp->valid){ /* current frame not inuse*/
@@ -57,7 +57,7 @@ void* get_frame(spte* spte_cur){
       break;
     }
   }
-    
+
   if(!ret) {
     struct frame *ret_fp = evict_frame();
     ret_fp->valid = true;
@@ -98,6 +98,7 @@ void free_frame(spte *spte_cur) {
       fp->valid = false;
       /*another case could have been a memory mapped file (dirty frame would need to be written back to fs on an exit(0).*/
   }
+  pagedir_clear_page(t->pagedir, (void*)spte_cur->vaddr);
 
   /*TODO handle a pinned frame. It should not be deallocated in case there
    is a system call that depends on the frame being present in memory.
@@ -168,17 +169,21 @@ static struct frame *evict_frame(void){
   ASSERT(spte_cur != NULL);
 
   struct frame *ret = NULL;
-  
+
   /*clk_frame_ptr -> end -> beginning -> clk_frame_ptr - 1*/
-  for(e = &clk_frame_ptr->elem; 
-      list_next(e) != &clk_frame_ptr->elem; 
+  for(e = &clk_frame_ptr->elem;
+      list_next(e) != &clk_frame_ptr->elem;
       e = (e == list_end(&frame_list))? list_begin(&frame_list): list_next(e)) {
+
+
     struct frame *fp = list_entry(e, struct frame, elem);
-    
+
+    if(spte_cur->isPinned) {continue;} /*found a frame to evict. Throw current frame into swap*/
+    /*this step might actually require a semaphore. What if every page has been pinned?
+    I would reach the end of this loop with ret still being NULL*/
+
     if(!pagedir_is_accessed(pd, (const void*) fp->page_addr)) {
-      if(!spte_cur->isPinned) { /*found a frame to evict. Throw current frame into swap*/ 
-	/*this step might actually require a semaphore. What if every page has been pinned? 
-	  I would reach the end of this loop with ret still being NULL*/
+
 	struct list_elem *pgs;
 
 	if(!pagedir_is_dirty(pd, fp->page_addr)) {
@@ -200,10 +205,14 @@ static struct frame *evict_frame(void){
 	ret = fp;
         struct list_elem *next = list_next(e);
 	clk_frame_ptr = list_entry(next, struct frame, elem);
-      }
+
     }
 
+<<<<<<< HEAD
     pagedir_set_accessed(pd, fp->page_addr, true);
+=======
+    pagedir_set_accessed(pd, spte_cur->vaddr, true);
+>>>>>>> 881a2daaf46dd94cafbe86e2a227f8cceef3464f
     if(ret != NULL) {
       fp->valid = true;
       break;
