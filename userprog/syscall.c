@@ -251,8 +251,10 @@ void exit(int status) {
   while(hash_next(&spte_i)) {
     spte *spte_cur = hash_entry(hash_cur(&spte_i), spte, hash_elem);
 
-    pagedir_clear_page(t->pagedir, spte_cur->vaddr);
-    free_frame(spte_cur);
+    if (!spte_cur->isPinned) {
+
+      free_frame(spte_cur);
+    }
   }
   spt_delete(spt);
 
@@ -421,6 +423,7 @@ int read(int fd, void* buffer,unsigned size){
 }
 
 int write(int fd, const void* buffer, unsigned size){
+
   int32_t retval;
   unsigned counter = 0;
   if (size == 0) {return 0;}
