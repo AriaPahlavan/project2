@@ -23,18 +23,19 @@ void swap_init(void){
   swap_size = block_size(swap_block) / block_per_page;
   /*bitmap to keep track of inuse swap slots; 0: not used*/
   swap_bm = bitmap_create(swap_size); 
+  
 }
 
 size_t swap_frame(void* page_ptr){
   lock_acquire(&swap_lock);
   /*search for empty slots*/ 
-  size_t swap_index = bitmap_scan_and_flip(swap_bm, 0, 1, true);
+  size_t swap_index = bitmap_scan_and_flip(swap_bm, 0, 1, false);
 
 
   /*write page into swap*/
   uint32_t i;
   for (i = 0; i < block_per_page; i++) {
-    block_write(swap_block, swap_index*block_per_page+i, page_ptr + BLOCK_SECTOR_SIZE * i);
+    block_write(swap_block, swap_index+i, page_ptr + BLOCK_SECTOR_SIZE * i);
   }
 
   lock_release(&swap_lock);

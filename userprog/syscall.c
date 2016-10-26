@@ -162,6 +162,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     exit(-1);
   }
 
+  thread_current()->esp = f->esp;
+
   if ((syscall_num > SYS_INUMBER) || (syscall_num < SYS_HALT)){
     exit(-1);
   }
@@ -231,6 +233,11 @@ void exit(int status) {
   struct thread *t = thread_current();
   t->exit_status = status;
 
+  /*release the filysys lock if needed (may not have been released due to page fault)*/
+  if(lock_held_by_current_thread(&lock_filesys)) {
+    lock_release(&lock_filesys);
+  }
+
   /*close same file in linklist, call close function*/
   for(e = list_begin(&open_file_list);e != list_end(&open_file_list);e = list_next(e))  {
     struct file_def* fp = list_entry(e,struct file_def, elem);
@@ -238,11 +245,6 @@ void exit(int status) {
       close(fp->fd);
       break;
     }
-  }
-  
-  /*release the filysys lock if needed (may not have been released due to page fault)*/
-  if(lock_held_by_current_thread(&lock_filesys)) {
-    lock_release(&lock_filesys);
   }
 
   struct hash *spt = t->spt;
@@ -474,7 +476,7 @@ unsigned tell(int fd){
 }
 
 void close(int fd){
-  lock_acquire(&lock_filesys);
+  lock_try_acquire(&lock_filesys);
   if ((fd==0) || (fd==1)) exit(-1);
 
   struct file_def* fp = find_file_def(fd);

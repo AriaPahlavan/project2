@@ -166,9 +166,11 @@ page_fault (struct intr_frame *f)
   struct thread *t = thread_current();
 
   bool valid = false;
-  if(is_user_vaddr(fault_addr) && (fault_addr >= t->entry) && user && not_present) {
+  bool stack_access = is_user_stack_access(fault_addr);
+  bool is_valid_access = is_user_vaddr(fault_addr);
+  if(is_valid_access && (fault_addr >= t->entry) && user && not_present && !stack_access) {
     valid = true;
-  } else if(is_user_stack_access(fault_addr)) {
+  } else if(stack_access && is_valid_access) {
     void *esp = user? f->esp: t->esp;
     if(fault_addr >= esp
        || (esp - fault_addr == 4) /*push*/

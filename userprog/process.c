@@ -710,8 +710,6 @@ setup_stack (void **esp, const child *cp)
 
   *esp = mp.i;
 
-  thread_current()->esp = esp;
-
   return success;
 }
 

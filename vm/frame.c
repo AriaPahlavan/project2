@@ -82,7 +82,8 @@ void free_frame(spte *spte_cur) {
   lock_acquire(&frame_lock);
 
   struct thread *t = thread_current();
-  struct frame* fp = find_frame(pagedir_get_page(t->pagedir, spte_cur->vaddr));
+  void *paddr = pagedir_get_page(t->pagedir, spte_cur->vaddr);
+  struct frame* fp = find_frame(paddr);
   if (fp == NULL) {
     lock_release(&frame_lock);
     return;
@@ -155,7 +156,15 @@ static struct frame *evict_frame(void){
   struct thread *t = thread_current();
   uint32_t *pd = t->pagedir;
   struct hash *spt = t->spt;
-  spte *spte_cur = spt_getSpte(spt, clk_frame_ptr->page_addr);
+  spte *spte_cur;
+  struct list_elem *pgs;
+  for(pgs = list_begin(&clk_frame_ptr->pages); pgs != list_end(&clk_frame_ptr->pages); pgs = list_next(pgs)) {
+    spte *spte_check = list_entry(pgs, spte, list_elem);
+    if((spte_cur = spt_getSpte(spt, spte_check->vaddr))) {
+      break;
+    }    
+  }
+
   ASSERT(spte_cur != NULL);
 
   struct frame *ret = NULL;
@@ -193,8 +202,8 @@ static struct frame *evict_frame(void){
 	clk_frame_ptr = list_entry(next, struct frame, elem);
       }
     }
-    
-    pagedir_set_accessed(pd, spte_cur->vaddr, true);
+
+    pagedir_set_accessed(pd, fp->page_addr, true);
     if(ret != NULL) {
       fp->valid = true;
       break;
