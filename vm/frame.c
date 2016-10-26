@@ -182,11 +182,11 @@ static struct frame *evict_frame(void){
     /*this step might actually require a semaphore. What if every page has been pinned?
     I would reach the end of this loop with ret still being NULL*/
 
-    if(!pagedir_is_accessed(pd, (const void*) fp->page_addr)) {
+    if(!pagedir_is_accessed(pd, (const void*) spte_cur->vaddr)) {
 
 	struct list_elem *pgs;
 
-	if(!pagedir_is_dirty(pd, fp->page_addr)) {
+	if(!pagedir_is_dirty(pd, spte_cur->vaddr)) {
 	  size_t swp_ind = swap_frame(fp->page_addr);
 
 	  for(pgs = list_begin(&fp->pages); pgs != list_end(&fp->pages); pgs = list_next(pgs)) {
@@ -208,11 +208,7 @@ static struct frame *evict_frame(void){
 
     }
 
-<<<<<<< HEAD
-    pagedir_set_accessed(pd, fp->page_addr, true);
-=======
     pagedir_set_accessed(pd, spte_cur->vaddr, true);
->>>>>>> 881a2daaf46dd94cafbe86e2a227f8cceef3464f
     if(ret != NULL) {
       fp->valid = true;
       break;

@@ -246,14 +246,6 @@ void exit(int status) {
       break;
     }
   }
-<<<<<<< HEAD
-=======
-
-  /*release the filysys lock if needed (may not have been released due to page fault)*/
-  if(lock_held_by_current_thread(&lock_filesys)) {
-    lock_release(&lock_filesys);
-  }
->>>>>>> 881a2daaf46dd94cafbe86e2a227f8cceef3464f
 
   struct hash *spt = t->spt;
   struct hash_iterator spte_i;
@@ -390,8 +382,7 @@ struct file_def* find_file_def(int fd){
         return fp;
     }
   }
-  return NULL;
-}
+  return NULL;}
 
 int filesize(int fd){
   int length;
