@@ -26,6 +26,7 @@ typedef struct struct_spte {
   bool isWritable;
 } spte;
 
+void spte_delete(spte *s);
 struct hash *spt_new(void);
 void spt_delete(struct hash *spt);
 

@@ -16,7 +16,6 @@
 #include "vm/page.h"
 
 static spte *spte_new(const void *vaddr);
-static void spte_delete(spte *s);
 
 static spte *spte_new(const void *vaddr) {
   if(!(vaddr && is_user_vaddr(vaddr))) {
@@ -39,7 +38,7 @@ static spte *spte_new(const void *vaddr) {
   return s;
 }
 
-static void spte_delete(spte *s) {
+void spte_delete(spte *s) {
   if(!s) {
     return;
   }

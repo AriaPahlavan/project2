@@ -252,8 +252,10 @@ void exit(int status) {
     if (!spte_cur->isPinned) {
 
       free_frame(spte_cur);
+
     }
   }
+
   spt_delete(spt);
 
   thread_exit();
